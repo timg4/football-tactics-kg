@@ -195,7 +195,7 @@ def load_events(session, match_id):
                   MATCH (e:Event {event_id: r.event_id}), (p:Player {player_id: r.player_id})
                   CREATE (e)-[:BY_PLAYER]->(p)""", rows=rels["by_player"])
         tx.run("""UNWIND $rows AS r
-                  MATCH (e:Pass {event_id: r.event_id}), (p:Player {player_id: r.player_id})
+                  MATCH (e:Event {event_id: r.event_id}), (p:Player {player_id: r.player_id})
                   CREATE (e)-[:RECEIVED_BY]->(p)""", rows=rels["received_by"])
         tx.run("""UNWIND $rows AS r
                   MATCH (e:Event {event_id: r.event_id}), (z:Zone {zone_id: r.zone_id})

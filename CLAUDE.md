@@ -16,6 +16,13 @@ We build a temporal KG from StatsBomb open football event data. Entities: matche
 - **LO11 service = Streamlit dashboard** (committed, not a stretch goal); report written in **LaTeX/Overleaf**; code lives in this GitHub repo (`timg4/KnowledgeGraphs`); full phase roadmap in `docs/plan.md`.
 - **Data subset: one full league season, primary = Premier League 2015/16** (`matches/2/27.json`, 380 matches, all event files present, 1.13 GB, no 360 data). Rationale: club teams are more comparable in skill and have settled tactics vs. national tournaments; profiling showed the *only* complete, balanced league seasons in the open data are the 2015/16 big-five (PL/La Liga/Serie A: 380 matches & 38/team; Ligue 1: 377; Bundesliga: 306) — every other league season is single-club-centric (e.g. Barcelona's La Liga). Expansion option if time allows: a second 2015/16 league for cross-league style comparison.
 
+## Status
+
+**Phases 0–2 complete (2026-06-10):** KG fully loaded & verified — 380 matches, 1.31M events,
+72k possessions, 644 players; all integrity checks green (`python -m src.ingest.verify`).
+**Next: Phase 3** — implement P1–P3 from `docs/patterns.md` as Cypher + Datalog.
+Current state & onboarding: **`docs/handover.md`**.
+
 ## Data
 
 StatsBomb Open Data, vendored at `open-data/` (~12 GB JSON total):
