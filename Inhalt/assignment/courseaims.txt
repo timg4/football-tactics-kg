@@ -1,0 +1,281 @@
+Knowledge Graph Lab
+Knowledge Graphs
+VU 192.116, 2.0h/3.0ECTS
+Course Content Details
+COURSE AIMS
+A Quick Overview
+The aim of this is course is to gain a deep understanding of Knowledge Graphs. It is divided into three blocks:
+
+Representations of Knowledge Graphs
+(logic- and ML-based)
+Systems for Knowledge Graphs
+(scalablility and reasoning)
+Applications of Knowledge Graphs
+(real-world enterprise AI)
+An overarching aim of the course is to understand the connections between Knowledge Graphs (KGs), Artificial Intelligence (AI), Machine Learning (ML), Deep Learning and Data Science. A particular focus is of gaining a broad understanding of all of the following learning outcomes, coming from throughout the database, semantic web, machine learning and data science communities.
+
+LEARNING OUTCOMES (LOs)
+Representations
+The aim in this part is to understand and apply the predominant representations of knowledge and data in Knowledge Graphs.
+
+
+(LO1) Understand and apply Knowledge Graph Embeddings
+Knowledge Graph Embeddings (KGEs) are a large field of representations and techniques focused on a shared principle: how to represent of symbolic knowledge - as in typical databases or datasets (in our case, graphs) - in a sub-symbolic way - as in typical machine learning or deep learning scenarios (in our case, as vectors). We will cover the principles as well as selected seminal and recent KGE models such as the translation-based TransE, the semantic matching-based ComplEx, and the neural network-based ConvE.
+
+(LO2) Understand and apply logical knowledge in KGs
+Logical knowledge representation is a broad traditional field of AI techniques rooted across many communities, including of course the knowledge representation and reasoning, databases, semantic web and other communities. As this aspect is covered in many courses, we will focus on (1) giving a short introduction, (2) show connections between the slightly different frameworks used by different communities and (3) focus on an aspect particularly relevant for Knowledge Graphs: how to represent logical knowledge that uses (i) full recursion - as needed by graph processing - and (ii) powerful object creation (existential quantification in logic terms) – as needed to discover unknown parts of a Knowledge Graph.
+
+(LO3) Understand and apply Graph Neural Networks
+Graph Neural Networks (GNNs) are a rapidly-growing field - successfully applied in many applications – based on a very clear idea: can the structure of the graph (i.e., the symbolic world) be used as the structure of an artificial neural network (ANN) as in typical machine learning and deep learning scenarios. We will cover the principles as well as selected models. The goal is to understand how machine learning and deep learning models based on neural networks can be guided by graph data and knowledge.
+
+(LO4) Compare different Knowledge Graph data models from the database, semantic web, machine learning and data science communities.
+KGEs, logical models and GNNs are ways of representing different forms of knowledge in a Knowledge Graph, and thus naturally need to talk about different data models that they are based on. In this part, we will dig deeper into different concrete data models of representing graphs and Knowledge Graphs. One particular focus will be temporal models for Knowledge Graphs. We will give brief overviews of data models from the database, Semantic Web and other communities, and will give pointers to courses that give more details on each of them.
+
+This, crucially, includes the connections between using these types of knowledge in one Knowledge Graph.
+
+LEARNING OUTCOMES (LOs)
+Systems
+The aim in this part is to be able to design and apply systems that manage KGs.
+
+
+(LO5) Design and implement architectures of a Knowledge Graph
+Designing an IT architecture for any complex AI applications is a challenge, typically requiring to integrate a number of technologies. In this part, we will consider different technology stacks available for Knowledge Graphs, and how to decide which capabilities should be handled by which parts of the architecture. This includes topics such as storing large Knowledge Graphs, and the border between what the Knowledge Graph should handle and what external application code should handle. As a main example, we are going to use the Vadalog system and architecture developed at the University of Oxford together with TU Wien, the Central Bank of Italy and many others. For technology stacks covered in detail by other courses, we will stay high level here and give pointers.
+
+(LO6) Describe and apply scalable reasoning methods in Knowledge Graphs
+While storing Knowledge Graphs is an important endeavour in itself, using it to derive new data, insights or other output, is a central service offered by a Knowledge Graph. Typically, for simple questions this is called querying, and for more complex questions and if it requires background knowledge, reasoning. Reasoning is a broad area, and in this part, we will focus on the representations and models most important for Knowledge Graphs: reasoning with KG Embeddings, logical knowledge that allows both full recursion as well as object creation, as well as Graph Neural Networks. We will also consider what it means to reason by combining these aspects.
+
+(LO7) Apply a system to create a Knowledge Graph
+In this part, we are going to look at the first part of the Knowledge Graph lifecycle, namely creation. We will give a broad overview of available techniques with some pointers for further information. For Knowledge Graphs this topic includes schema mapping – with many classical techniques stemming from the database community on data exchange and integration, and record linkage, which typically includes an ensemble of Machine Learning methods. These topics will be covered as far as needed for giving a full picture of the KG lifecycle, and connections to other courses will be highlighted.
+
+(LO8) Apply a system to evolve a Knowledge Graph
+Evolving a Knowledge Graph is a broad topic, and we are going to cover a representative selection of techniques here. In general, it can be divided into two areas: (i) Knowledge Graph completion (i.e., adding to it). We will here discuss link prediction as a central method, in particular including KG Embeddings as well as logic based reasoning with full recursion and existential quantification. We are also going to discuss how to add knowledge to a KG through techniques such as rule learning or model induction. (ii) Knowledge Graph cleaning (i.e. removing parts of a KG) which can either effect the data or knowledge stored in a KG. This is of course broader, and can include topics such as schema evolution, view maintenance, etc. We will provide a broad picture and pointers for further topics covered in other courses.
+
+The latter two learning outcomes (together with LO11) provide a typical life-cycle of Knowledge Graphs: getting data into a KG, i.e., creating it (LO6), evolving a KG into a new one (LO7) and getting data out of a KG by providing services based on it (L11). Note that the term “life-cycle” is used loosely here, as in many Knowledge Graphs, providing applications is not necessarily the end of the life-cycle, but part of an on-going activity.
+
+
+
+LEARNING OUTCOMES (LOs)
+Applications
+The aim of this part is to understand and design applications of Knowledge Graphs.
+
+
+(LO9) Describe and design real-world applications of Knowledge Graphs
+Evolving a Knowledge Graph is a broad topic, and we are going to cover a representative selection of techniques here. In general, it can be divided into two areas: (i) Knowledge Graph completion (i.e., adding to it). We will here discuss link prediction as a central method, in particular including KG Embeddings as well as logic based reasoning with full recursion and existential quantification. We are also going to discuss how to add knowledge to a KG through techniques such as rule learning or model induction. (ii) Knowledge Graph cleaning (i.e. removing parts of a KG) which can either effect the data or knowledge stored in a KG. This is of course broader, and can include topics such as schema evolution, view maintenance, etc. We will provide a broad picture and pointers for further topics covered in other courses.
+
+(LO10) Describe financial Knowledge Graph applications
+We are going to dive deep into financial Knowledge Graph applications, which includes the banking sector (commercial banks), the central banking sector (i.e., national banks) and the insurance sector. All of these have connections but also different requirements that show-off particular properties of KGs quite well: while for a commercial bank a KG may be used for predicting customer needs, or in the insurance sector to ascertain credit worthiness, in a central bank the knowledge in a KG often is related to laws and regulations that need to be upheld (and checked by) central banks to protect financial systems. A typical uses case is for example helping to protect companies from hostile takeovers during crises, which we will take a deep dive into the respective real-world Knowledge Graph.
+
+(LO11) Apply a system to provide services through a Knowledge Graph
+As a final step of creating and then involving a KG, we here give a glimpse into the finale step, namely services that can be provided through Knowledge Graphs. This will necessarily be just an overview, as many AI-based services today use one or more Knowledge Graphs. The typical services that information systems in general provide are in terms of general-purpose or broad analytics provided to a user, or in terms of specific queries or questions asked to a system. While we are point to a specific courses here for more details, we will give a broad overview of how to build structured query interfaces for KG queries and analytics, visualize Knowledge Graphs, build natural language query interfaces for complex KG queries and questions, and build KG-based recommender systems that use deep logic and KGE-based knowledge. In all of these, we will focus on the KG aspects, seeing how in particular a KG is used to support these services. Our goal is here not to understand visualization, recommender systems, etc. – there are specific courses for that – but to understand how an architecture that includes KGs works, and how KGs specifically help these services.
+
+(LO12) Describe the connections between Knowledge Graphs (KGs), Machine Learning (ML) and Artificial Intelligence (AI)
+It is clear that Knowledge Graphs are an area of Artificial Intelligence where a number of techniques come together, and where new Machine Learning techniques such as KG Embeddings native to KGs have emergence. Arguably, it is one of the strengths of KG-based systems to allow all such techniques to come together in a well-organized architecture (some call it a “melting pot”). Yet, is all of KGs Artificial Intelligence? What about database systems and highly-scalable data processing techniques? A particularly interesting angle here are the reasoning techniques: How are traditional logic-based reasoning techniques coming together with Machine Learning-based ones? What is the connection to Neural Network-based methods, in particular those where the KG plays a central role (such as in GNNs)? These are questions we will openly consider in this part to allow everyone to not only understand the individual techniques, but how they connect to each other in KGs.
+
+A particular focus here is getting a holistic understanding of the topics including their connections.
+
+
+More questions?
+
+Email the lecturer Prof. Dr. Emanuel Sallinger (sallinger@dbai.tuwien.ac.at) and the KG Lab team!
+
+About the Knowledge Graph Lab at TU Wien
+The Knowledge Graph Lab at TU Wien is part of the Database and Artificial Intelligence (DBAI) group at the Institute of Logic and Computation of the Faculty of Informatics. It is funded by the Vienna Science and Technology Fund (WWTF) under the Vienna Research Group scheme - "Vienna Research Group on Scalable Reasoning in Knowledge Graphs" (VRG18-013).
+
+TU Informatics
+DBAI
+WWTF
+DeepReason.ai
+We would like to thank DeepReason.ai, a spin-out of the University of Oxford, for the joint development of the Vadalog Knowledge Graph Management System and the collaboration.
+
+Contact
+For inquiries please contact Prof. Dr. Emanuel Sallinger, head of the Knowledge Graph Lab at TU Wien, at <sallinger@dbai.tuwien.ac.at>.
+
+Impressum - Offenlegung gemäß § 25 Mediengesetz: Inhaber der Website ist das Institut für Logic and Computation an der Technischen Universität Wien, 1040 Wien. Die TU Wien distanziert sich von den Inhalten aller extern gelinkten Seiten und übernimmt diesbezüglich keine Haftung. Disclaimer. Datenschutzerklärung.
+
+Knowledge Graph Lab
+Knowledge Graphs
+VU 192.116, 2.0h/3.0ECTS
+Course Content Details
+COURSE AIMS
+A Quick Overview
+The aim of this is course is to gain a deep understanding of Knowledge Graphs. It is divided into three blocks:
+
+Representations of Knowledge Graphs
+(logic- and ML-based)
+Systems for Knowledge Graphs
+(scalablility and reasoning)
+Applications of Knowledge Graphs
+(real-world enterprise AI)
+An overarching aim of the course is to understand the connections between Knowledge Graphs (KGs), Artificial Intelligence (AI), Machine Learning (ML), Deep Learning and Data Science. A particular focus is of gaining a broad understanding of all of the following learning outcomes, coming from throughout the database, semantic web, machine learning and data science communities.
+
+LEARNING OUTCOMES (LOs)
+Representations
+The aim in this part is to understand and apply the predominant representations of knowledge and data in Knowledge Graphs.
+
+
+(LO1) Understand and apply Knowledge Graph Embeddings
+Knowledge Graph Embeddings (KGEs) are a large field of representations and techniques focused on a shared principle: how to represent of symbolic knowledge - as in typical databases or datasets (in our case, graphs) - in a sub-symbolic way - as in typical machine learning or deep learning scenarios (in our case, as vectors). We will cover the principles as well as selected seminal and recent KGE models such as the translation-based TransE, the semantic matching-based ComplEx, and the neural network-based ConvE.
+
+(LO2) Understand and apply logical knowledge in KGs
+Logical knowledge representation is a broad traditional field of AI techniques rooted across many communities, including of course the knowledge representation and reasoning, databases, semantic web and other communities. As this aspect is covered in many courses, we will focus on (1) giving a short introduction, (2) show connections between the slightly different frameworks used by different communities and (3) focus on an aspect particularly relevant for Knowledge Graphs: how to represent logical knowledge that uses (i) full recursion - as needed by graph processing - and (ii) powerful object creation (existential quantification in logic terms) – as needed to discover unknown parts of a Knowledge Graph.
+
+(LO3) Understand and apply Graph Neural Networks
+Graph Neural Networks (GNNs) are a rapidly-growing field - successfully applied in many applications – based on a very clear idea: can the structure of the graph (i.e., the symbolic world) be used as the structure of an artificial neural network (ANN) as in typical machine learning and deep learning scenarios. We will cover the principles as well as selected models. The goal is to understand how machine learning and deep learning models based on neural networks can be guided by graph data and knowledge.
+
+(LO4) Compare different Knowledge Graph data models from the database, semantic web, machine learning and data science communities.
+KGEs, logical models and GNNs are ways of representing different forms of knowledge in a Knowledge Graph, and thus naturally need to talk about different data models that they are based on. In this part, we will dig deeper into different concrete data models of representing graphs and Knowledge Graphs. One particular focus will be temporal models for Knowledge Graphs. We will give brief overviews of data models from the database, Semantic Web and other communities, and will give pointers to courses that give more details on each of them.
+
+This, crucially, includes the connections between using these types of knowledge in one Knowledge Graph.
+
+LEARNING OUTCOMES (LOs)
+Systems
+The aim in this part is to be able to design and apply systems that manage KGs.
+
+
+(LO5) Design and implement architectures of a Knowledge Graph
+Designing an IT architecture for any complex AI applications is a challenge, typically requiring to integrate a number of technologies. In this part, we will consider different technology stacks available for Knowledge Graphs, and how to decide which capabilities should be handled by which parts of the architecture. This includes topics such as storing large Knowledge Graphs, and the border between what the Knowledge Graph should handle and what external application code should handle. As a main example, we are going to use the Vadalog system and architecture developed at the University of Oxford together with TU Wien, the Central Bank of Italy and many others. For technology stacks covered in detail by other courses, we will stay high level here and give pointers.
+
+(LO6) Describe and apply scalable reasoning methods in Knowledge Graphs
+While storing Knowledge Graphs is an important endeavour in itself, using it to derive new data, insights or other output, is a central service offered by a Knowledge Graph. Typically, for simple questions this is called querying, and for more complex questions and if it requires background knowledge, reasoning. Reasoning is a broad area, and in this part, we will focus on the representations and models most important for Knowledge Graphs: reasoning with KG Embeddings, logical knowledge that allows both full recursion as well as object creation, as well as Graph Neural Networks. We will also consider what it means to reason by combining these aspects.
+
+(LO7) Apply a system to create a Knowledge Graph
+In this part, we are going to look at the first part of the Knowledge Graph lifecycle, namely creation. We will give a broad overview of available techniques with some pointers for further information. For Knowledge Graphs this topic includes schema mapping – with many classical techniques stemming from the database community on data exchange and integration, and record linkage, which typically includes an ensemble of Machine Learning methods. These topics will be covered as far as needed for giving a full picture of the KG lifecycle, and connections to other courses will be highlighted.
+
+(LO8) Apply a system to evolve a Knowledge Graph
+Evolving a Knowledge Graph is a broad topic, and we are going to cover a representative selection of techniques here. In general, it can be divided into two areas: (i) Knowledge Graph completion (i.e., adding to it). We will here discuss link prediction as a central method, in particular including KG Embeddings as well as logic based reasoning with full recursion and existential quantification. We are also going to discuss how to add knowledge to a KG through techniques such as rule learning or model induction. (ii) Knowledge Graph cleaning (i.e. removing parts of a KG) which can either effect the data or knowledge stored in a KG. This is of course broader, and can include topics such as schema evolution, view maintenance, etc. We will provide a broad picture and pointers for further topics covered in other courses.
+
+The latter two learning outcomes (together with LO11) provide a typical life-cycle of Knowledge Graphs: getting data into a KG, i.e., creating it (LO6), evolving a KG into a new one (LO7) and getting data out of a KG by providing services based on it (L11). Note that the term “life-cycle” is used loosely here, as in many Knowledge Graphs, providing applications is not necessarily the end of the life-cycle, but part of an on-going activity.
+
+
+
+LEARNING OUTCOMES (LOs)
+Applications
+The aim of this part is to understand and design applications of Knowledge Graphs.
+
+
+(LO9) Describe and design real-world applications of Knowledge Graphs
+Evolving a Knowledge Graph is a broad topic, and we are going to cover a representative selection of techniques here. In general, it can be divided into two areas: (i) Knowledge Graph completion (i.e., adding to it). We will here discuss link prediction as a central method, in particular including KG Embeddings as well as logic based reasoning with full recursion and existential quantification. We are also going to discuss how to add knowledge to a KG through techniques such as rule learning or model induction. (ii) Knowledge Graph cleaning (i.e. removing parts of a KG) which can either effect the data or knowledge stored in a KG. This is of course broader, and can include topics such as schema evolution, view maintenance, etc. We will provide a broad picture and pointers for further topics covered in other courses.
+
+(LO10) Describe financial Knowledge Graph applications
+We are going to dive deep into financial Knowledge Graph applications, which includes the banking sector (commercial banks), the central banking sector (i.e., national banks) and the insurance sector. All of these have connections but also different requirements that show-off particular properties of KGs quite well: while for a commercial bank a KG may be used for predicting customer needs, or in the insurance sector to ascertain credit worthiness, in a central bank the knowledge in a KG often is related to laws and regulations that need to be upheld (and checked by) central banks to protect financial systems. A typical uses case is for example helping to protect companies from hostile takeovers during crises, which we will take a deep dive into the respective real-world Knowledge Graph.
+
+(LO11) Apply a system to provide services through a Knowledge Graph
+As a final step of creating and then involving a KG, we here give a glimpse into the finale step, namely services that can be provided through Knowledge Graphs. This will necessarily be just an overview, as many AI-based services today use one or more Knowledge Graphs. The typical services that information systems in general provide are in terms of general-purpose or broad analytics provided to a user, or in terms of specific queries or questions asked to a system. While we are point to a specific courses here for more details, we will give a broad overview of how to build structured query interfaces for KG queries and analytics, visualize Knowledge Graphs, build natural language query interfaces for complex KG queries and questions, and build KG-based recommender systems that use deep logic and KGE-based knowledge. In all of these, we will focus on the KG aspects, seeing how in particular a KG is used to support these services. Our goal is here not to understand visualization, recommender systems, etc. – there are specific courses for that – but to understand how an architecture that includes KGs works, and how KGs specifically help these services.
+
+(LO12) Describe the connections between Knowledge Graphs (KGs), Machine Learning (ML) and Artificial Intelligence (AI)
+It is clear that Knowledge Graphs are an area of Artificial Intelligence where a number of techniques come together, and where new Machine Learning techniques such as KG Embeddings native to KGs have emergence. Arguably, it is one of the strengths of KG-based systems to allow all such techniques to come together in a well-organized architecture (some call it a “melting pot”). Yet, is all of KGs Artificial Intelligence? What about database systems and highly-scalable data processing techniques? A particularly interesting angle here are the reasoning techniques: How are traditional logic-based reasoning techniques coming together with Machine Learning-based ones? What is the connection to Neural Network-based methods, in particular those where the KG plays a central role (such as in GNNs)? These are questions we will openly consider in this part to allow everyone to not only understand the individual techniques, but how they connect to each other in KGs.
+
+A particular focus here is getting a holistic understanding of the topics including their connections.
+
+
+More questions?
+
+Email the lecturer Prof. Dr. Emanuel Sallinger (sallinger@dbai.tuwien.ac.at) and the KG Lab team!
+
+About the Knowledge Graph Lab at TU Wien
+The Knowledge Graph Lab at TU Wien is part of the Database and Artificial Intelligence (DBAI) group at the Institute of Logic and Computation of the Faculty of Informatics. It is funded by the Vienna Science and Technology Fund (WWTF) under the Vienna Research Group scheme - "Vienna Research Group on Scalable Reasoning in Knowledge Graphs" (VRG18-013).
+
+TU Informatics
+DBAI
+WWTF
+DeepReason.ai
+We would like to thank DeepReason.ai, a spin-out of the University of Oxford, for the joint development of the Vadalog Knowledge Graph Management System and the collaboration.
+
+Contact
+For inquiries please contact Prof. Dr. Emanuel Sallinger, head of the Knowledge Graph Lab at TU Wien, at <sallinger@dbai.tuwien.ac.at>.
+
+Impressum - Offenlegung gemäß § 25 Mediengesetz: Inhaber der Website ist das Institut für Logic and Computation an der Technischen Universität Wien, 1040 Wien. Die TU Wien distanziert sich von den Inhalten aller extern gelinkten Seiten und übernimmt diesbezüglich keine Haftung. Disclaimer. Datenschutzerklärung.
+
+Knowledge Graph Lab
+Knowledge Graphs
+VU 192.116, 2.0h/3.0ECTS
+Course Content Details
+COURSE AIMS
+A Quick Overview
+The aim of this is course is to gain a deep understanding of Knowledge Graphs. It is divided into three blocks:
+
+Representations of Knowledge Graphs
+(logic- and ML-based)
+Systems for Knowledge Graphs
+(scalablility and reasoning)
+Applications of Knowledge Graphs
+(real-world enterprise AI)
+An overarching aim of the course is to understand the connections between Knowledge Graphs (KGs), Artificial Intelligence (AI), Machine Learning (ML), Deep Learning and Data Science. A particular focus is of gaining a broad understanding of all of the following learning outcomes, coming from throughout the database, semantic web, machine learning and data science communities.
+
+LEARNING OUTCOMES (LOs)
+Representations
+The aim in this part is to understand and apply the predominant representations of knowledge and data in Knowledge Graphs.
+
+
+(LO1) Understand and apply Knowledge Graph Embeddings
+Knowledge Graph Embeddings (KGEs) are a large field of representations and techniques focused on a shared principle: how to represent of symbolic knowledge - as in typical databases or datasets (in our case, graphs) - in a sub-symbolic way - as in typical machine learning or deep learning scenarios (in our case, as vectors). We will cover the principles as well as selected seminal and recent KGE models such as the translation-based TransE, the semantic matching-based ComplEx, and the neural network-based ConvE.
+
+(LO2) Understand and apply logical knowledge in KGs
+Logical knowledge representation is a broad traditional field of AI techniques rooted across many communities, including of course the knowledge representation and reasoning, databases, semantic web and other communities. As this aspect is covered in many courses, we will focus on (1) giving a short introduction, (2) show connections between the slightly different frameworks used by different communities and (3) focus on an aspect particularly relevant for Knowledge Graphs: how to represent logical knowledge that uses (i) full recursion - as needed by graph processing - and (ii) powerful object creation (existential quantification in logic terms) – as needed to discover unknown parts of a Knowledge Graph.
+
+(LO3) Understand and apply Graph Neural Networks
+Graph Neural Networks (GNNs) are a rapidly-growing field - successfully applied in many applications – based on a very clear idea: can the structure of the graph (i.e., the symbolic world) be used as the structure of an artificial neural network (ANN) as in typical machine learning and deep learning scenarios. We will cover the principles as well as selected models. The goal is to understand how machine learning and deep learning models based on neural networks can be guided by graph data and knowledge.
+
+(LO4) Compare different Knowledge Graph data models from the database, semantic web, machine learning and data science communities.
+KGEs, logical models and GNNs are ways of representing different forms of knowledge in a Knowledge Graph, and thus naturally need to talk about different data models that they are based on. In this part, we will dig deeper into different concrete data models of representing graphs and Knowledge Graphs. One particular focus will be temporal models for Knowledge Graphs. We will give brief overviews of data models from the database, Semantic Web and other communities, and will give pointers to courses that give more details on each of them.
+
+This, crucially, includes the connections between using these types of knowledge in one Knowledge Graph.
+
+LEARNING OUTCOMES (LOs)
+Systems
+The aim in this part is to be able to design and apply systems that manage KGs.
+
+
+(LO5) Design and implement architectures of a Knowledge Graph
+Designing an IT architecture for any complex AI applications is a challenge, typically requiring to integrate a number of technologies. In this part, we will consider different technology stacks available for Knowledge Graphs, and how to decide which capabilities should be handled by which parts of the architecture. This includes topics such as storing large Knowledge Graphs, and the border between what the Knowledge Graph should handle and what external application code should handle. As a main example, we are going to use the Vadalog system and architecture developed at the University of Oxford together with TU Wien, the Central Bank of Italy and many others. For technology stacks covered in detail by other courses, we will stay high level here and give pointers.
+
+(LO6) Describe and apply scalable reasoning methods in Knowledge Graphs
+While storing Knowledge Graphs is an important endeavour in itself, using it to derive new data, insights or other output, is a central service offered by a Knowledge Graph. Typically, for simple questions this is called querying, and for more complex questions and if it requires background knowledge, reasoning. Reasoning is a broad area, and in this part, we will focus on the representations and models most important for Knowledge Graphs: reasoning with KG Embeddings, logical knowledge that allows both full recursion as well as object creation, as well as Graph Neural Networks. We will also consider what it means to reason by combining these aspects.
+
+(LO7) Apply a system to create a Knowledge Graph
+In this part, we are going to look at the first part of the Knowledge Graph lifecycle, namely creation. We will give a broad overview of available techniques with some pointers for further information. For Knowledge Graphs this topic includes schema mapping – with many classical techniques stemming from the database community on data exchange and integration, and record linkage, which typically includes an ensemble of Machine Learning methods. These topics will be covered as far as needed for giving a full picture of the KG lifecycle, and connections to other courses will be highlighted.
+
+(LO8) Apply a system to evolve a Knowledge Graph
+Evolving a Knowledge Graph is a broad topic, and we are going to cover a representative selection of techniques here. In general, it can be divided into two areas: (i) Knowledge Graph completion (i.e., adding to it). We will here discuss link prediction as a central method, in particular including KG Embeddings as well as logic based reasoning with full recursion and existential quantification. We are also going to discuss how to add knowledge to a KG through techniques such as rule learning or model induction. (ii) Knowledge Graph cleaning (i.e. removing parts of a KG) which can either effect the data or knowledge stored in a KG. This is of course broader, and can include topics such as schema evolution, view maintenance, etc. We will provide a broad picture and pointers for further topics covered in other courses.
+
+The latter two learning outcomes (together with LO11) provide a typical life-cycle of Knowledge Graphs: getting data into a KG, i.e., creating it (LO6), evolving a KG into a new one (LO7) and getting data out of a KG by providing services based on it (L11). Note that the term “life-cycle” is used loosely here, as in many Knowledge Graphs, providing applications is not necessarily the end of the life-cycle, but part of an on-going activity.
+
+
+
+LEARNING OUTCOMES (LOs)
+Applications
+The aim of this part is to understand and design applications of Knowledge Graphs.
+
+
+(LO9) Describe and design real-world applications of Knowledge Graphs
+Evolving a Knowledge Graph is a broad topic, and we are going to cover a representative selection of techniques here. In general, it can be divided into two areas: (i) Knowledge Graph completion (i.e., adding to it). We will here discuss link prediction as a central method, in particular including KG Embeddings as well as logic based reasoning with full recursion and existential quantification. We are also going to discuss how to add knowledge to a KG through techniques such as rule learning or model induction. (ii) Knowledge Graph cleaning (i.e. removing parts of a KG) which can either effect the data or knowledge stored in a KG. This is of course broader, and can include topics such as schema evolution, view maintenance, etc. We will provide a broad picture and pointers for further topics covered in other courses.
+
+(LO10) Describe financial Knowledge Graph applications
+We are going to dive deep into financial Knowledge Graph applications, which includes the banking sector (commercial banks), the central banking sector (i.e., national banks) and the insurance sector. All of these have connections but also different requirements that show-off particular properties of KGs quite well: while for a commercial bank a KG may be used for predicting customer needs, or in the insurance sector to ascertain credit worthiness, in a central bank the knowledge in a KG often is related to laws and regulations that need to be upheld (and checked by) central banks to protect financial systems. A typical uses case is for example helping to protect companies from hostile takeovers during crises, which we will take a deep dive into the respective real-world Knowledge Graph.
+
+(LO11) Apply a system to provide services through a Knowledge Graph
+As a final step of creating and then involving a KG, we here give a glimpse into the finale step, namely services that can be provided through Knowledge Graphs. This will necessarily be just an overview, as many AI-based services today use one or more Knowledge Graphs. The typical services that information systems in general provide are in terms of general-purpose or broad analytics provided to a user, or in terms of specific queries or questions asked to a system. While we are point to a specific courses here for more details, we will give a broad overview of how to build structured query interfaces for KG queries and analytics, visualize Knowledge Graphs, build natural language query interfaces for complex KG queries and questions, and build KG-based recommender systems that use deep logic and KGE-based knowledge. In all of these, we will focus on the KG aspects, seeing how in particular a KG is used to support these services. Our goal is here not to understand visualization, recommender systems, etc. – there are specific courses for that – but to understand how an architecture that includes KGs works, and how KGs specifically help these services.
+
+(LO12) Describe the connections between Knowledge Graphs (KGs), Machine Learning (ML) and Artificial Intelligence (AI)
+It is clear that Knowledge Graphs are an area of Artificial Intelligence where a number of techniques come together, and where new Machine Learning techniques such as KG Embeddings native to KGs have emergence. Arguably, it is one of the strengths of KG-based systems to allow all such techniques to come together in a well-organized architecture (some call it a “melting pot”). Yet, is all of KGs Artificial Intelligence? What about database systems and highly-scalable data processing techniques? A particularly interesting angle here are the reasoning techniques: How are traditional logic-based reasoning techniques coming together with Machine Learning-based ones? What is the connection to Neural Network-based methods, in particular those where the KG plays a central role (such as in GNNs)? These are questions we will openly consider in this part to allow everyone to not only understand the individual techniques, but how they connect to each other in KGs.
+
+A particular focus here is getting a holistic understanding of the topics including their connections.
+
+
+More questions?
+
+Email the lecturer Prof. Dr. Emanuel Sallinger (sallinger@dbai.tuwien.ac.at) and the KG Lab team!
+
+About the Knowledge Graph Lab at TU Wien
+The Knowledge Graph Lab at TU Wien is part of the Database and Artificial Intelligence (DBAI) group at the Institute of Logic and Computation of the Faculty of Informatics. It is funded by the Vienna Science and Technology Fund (WWTF) under the Vienna Research Group scheme - "Vienna Research Group on Scalable Reasoning in Knowledge Graphs" (VRG18-013).
+
+TU Informatics
+DBAI
+WWTF
+DeepReason.ai
+We would like to thank DeepReason.ai, a spin-out of the University of Oxford, for the joint development of the Vadalog Knowledge Graph Management System and the collaboration.
+
+Contact
+For inquiries please contact Prof. Dr. Emanuel Sallinger, head of the Knowledge Graph Lab at TU Wien, at <sallinger@dbai.tuwien.ac.at>.
+
+Impressum - Offenlegung gemäß § 25 Mediengesetz: Inhaber der Website ist das Institut für Logic and Computation an der Technischen Universität Wien, 1040 Wien. Die TU Wien distanziert sich von den Inhalten aller extern gelinkten Seiten und übernimmt diesbezüglich keine Haftung. Disclaimer. Datenschutzerklärung.
