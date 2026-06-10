@@ -1,0 +1,10 @@
+# Core (Phases 1-4). Embeddings extras (Phase 5: pykeen + torch) live in
+# requirements-embeddings.txt to keep this env light.
+neo4j>=5.20
+pandas>=2.0
+matplotlib>=3.8
+scikit-learn>=1.4
+streamlit>=1.35
+duckdb>=1.0
+jupyter
+mplsoccer

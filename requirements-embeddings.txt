@@ -1,0 +1,5 @@
+# Phase 5 only (LO1/LO8 experiment). Install into the venv when needed:
+#   pip install -r requirements-embeddings.txt
+# If resolution fails on this Python version, create a pyenv 3.11 venv instead.
+torch
+pykeen>=1.10

@@ -1,1 +1,17 @@
+# StatsBomb data (12 GB) — clone from https://github.com/statsbomb/open-data
 open-data/
+
+# Neo4j container state
+neo4j/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Generated artifacts (Datalog facts, triple exports, results)
+generated/
+
+# macOS
+.DS_Store
