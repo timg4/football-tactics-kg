@@ -32,7 +32,7 @@ def main():
         # per-match: event counts match the source file, NEXT chain is a single path
         sample = random.sample(loaded, min(5, len(loaded)))
         for mid in sample:
-            src_n = len(json.loads((DATA_DIR / "events" / f"{mid}.json").read_text()))
+            src_n = len(json.loads((DATA_DIR / "events" / f"{mid}.json").read_text(encoding="utf-8")))
             row = s.run("""
                 MATCH (e:Event {match_id: $mid})
                 OPTIONAL MATCH (e)-[r:NEXT]->(:Event)

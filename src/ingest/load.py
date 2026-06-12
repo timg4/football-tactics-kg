@@ -33,7 +33,7 @@ def setup_schema(session):
 
 
 def load_matches(session):
-    matches = json.loads((DATA_DIR / "matches" / str(common.COMPETITION_ID) / f"{common.SEASON_ID}.json").read_text())
+    matches = json.loads((DATA_DIR / "matches" / str(common.COMPETITION_ID) / f"{common.SEASON_ID}.json").read_text(encoding="utf-8"))
     rows = [{
         "match_id": m["match_id"],
         "date": m["match_date"],
@@ -63,7 +63,7 @@ def load_matches(session):
 
 
 def load_lineups(session, match_id):
-    lineups = json.loads((DATA_DIR / "lineups" / f"{match_id}.json").read_text())
+    lineups = json.loads((DATA_DIR / "lineups" / f"{match_id}.json").read_text(encoding="utf-8"))
     rows = []
     for side in lineups:
         for p in side["lineup"]:
@@ -166,7 +166,7 @@ def event_rows(events, match_id):
 
 
 def load_events(session, match_id):
-    events = json.loads((DATA_DIR / "events" / f"{match_id}.json").read_text())
+    events = json.loads((DATA_DIR / "events" / f"{match_id}.json").read_text(encoding="utf-8"))
     nodes, rels, poss_rows = event_rows(events, match_id)
 
     def run(tx):
