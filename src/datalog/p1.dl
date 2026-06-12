@@ -1,0 +1,66 @@
+// P1 Pressing Regain as recursive Datalog (Soufflé dialect).
+// Mirrors src/patterns/cypher.py P1; formal definition in docs/patterns.md.
+// Facts produced by `python -m src.datalog.export --tsv` (generated/datalog/).
+//
+//   souffle -F generated/datalog -D generated/datalog src/datalog/p1.dl
+//
+// reach/3 is the recursive core (LO2): the transitive closure of `next`
+// bounded by the 5-second window and the period -- exactly the
+// NEXT*1..k path semantics of the Cypher variant.
+
+.type Eid <: symbol
+
+// EDB (exported from the KG) ------------------------------------------------
+.decl event(eid: Eid, mid: number, idx: number, period: number, ts: float,
+            type: symbol, x: float, team: number, outcome: symbol,
+            recovery_failure: number)
+.input event
+
+.decl next(a: Eid, b: Eid)
+.input next
+
+.decl part_of(eid: Eid, mid: number, poss: number)
+.input part_of
+
+.decl possession(mid: number, poss: number, team: number, play_pattern: symbol)
+.input possession
+
+// Derived base predicates ----------------------------------------------------
+#define MINX 60.0
+#define DT 5.0
+
+.decl pressure(p: Eid, mid: number, team: number, ts: float, period: number)
+pressure(P, M, T, TS, PD) :-
+    event(P, M, _, PD, TS, "Pressure", X, T, _, _), X >= MINX.
+
+.decl wins_ball(r: Eid, team: number)
+wins_ball(R, T) :- event(R, _, _, _, _, "Ball Recovery", _, T, _, 0).
+wins_ball(R, T) :- event(R, _, _, _, _, "Interception", _, T, O, _), won(O).
+wins_ball(R, T) :- event(R, _, _, _, _, "Duel", _, T, O, _), won(O).
+
+.decl won(o: symbol)
+won("Won"). won("Success In Play"). won("Success Out").
+
+// Recursion: events reachable from pressure P within DT, same period ---------
+.decl reach(p: Eid, e: Eid, depth: number)
+reach(P, E, 1) :-
+    pressure(P, _, _, TS, PD), next(P, E),
+    event(E, _, _, PD, TE, _, _, _, _, _), TE - TS <= DT.
+reach(P, E, D + 1) :-
+    reach(P, M, D), D < 10, next(M, E),
+    pressure(P, _, _, TS, PD),
+    event(E, _, _, PD, TE, _, _, _, _, _), TE - TS <= DT.
+
+// P1, branch a: an explicit regain event by the pressing team ----------------
+.decl p1(p: Eid)
+p1(P) :- pressure(P, _, T, _, _), reach(P, R, _), wins_ball(R, T).
+
+// P1, branch b: the next possession belongs to the pressing team and starts
+// within DT (turnover without an explicit regain event)
+p1(P) :-
+    pressure(P, M, T, TS, PD), part_of(P, M, PO),
+    possession(M, PO + 1, T, _),
+    part_of(F, M, PO + 1),
+    event(F, M, _, PD, TF, _, _, _, _, _), TF - TS <= DT.
+
+.output p1

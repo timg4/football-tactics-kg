@@ -1,0 +1,43 @@
+// P2 Fast Transition as Datalog (Soufflé dialect) -- non-recursive rule,
+// included for the Cypher/Datalog comparison. Definition: docs/patterns.md.
+//
+//   souffle -F generated/datalog -D generated/datalog src/datalog/p2.dl
+
+.type Eid <: symbol
+
+.decl event(eid: Eid, mid: number, idx: number, period: number, ts: float,
+            type: symbol, x: float, team: number, outcome: symbol,
+            recovery_failure: number)
+.input event
+
+.decl part_of(eid: Eid, mid: number, poss: number)
+.input part_of
+
+.decl possession(mid: number, poss: number, team: number, play_pattern: symbol)
+.input possession
+
+#define TMAX 15.0
+#define MINPROG 30.0
+#define OWNHALF 60.0
+
+.decl open_play(pp: symbol)
+open_play(PP) :- possession(_, _, _, PP), PP != "From Corner",
+                 PP != "From Free Kick", PP != "From Throw In",
+                 PP != "From Kick Off", PP != "From Penalty".
+
+// first located event of a possession = minimal idx among events with an x
+.decl first_event(mid: number, poss: number, f: Eid)
+first_event(M, PO, F) :-
+    part_of(F, M, PO), event(F, M, IDX, _, _, _, X, _, _, _), X >= 0.0,
+    IDX = min I : { part_of(E, M, PO), event(E, M, I, _, _, _, X2, _, _, _), X2 >= 0.0 }.
+
+.decl p2(s: Eid)
+p2(S) :-
+    possession(M, PO, T, PP), open_play(PP),
+    first_event(M, PO, F),
+    event(F, M, _, PD, TF, _, XF, _, _, _), XF <= OWNHALF,
+    part_of(S, M, PO),
+    event(S, M, _, PD, TS, "Shot", XS, T, _, _),
+    TS - TF <= TMAX, XS - XF >= MINPROG.
+
+.output p2
