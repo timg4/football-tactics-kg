@@ -18,9 +18,12 @@ We build a temporal KG from StatsBomb open football event data. Entities: matche
 
 ## Status
 
-**Phases 0–2 complete (2026-06-10):** KG fully loaded & verified — 380 matches, 1.31M events,
-72k possessions, 644 players; all integrity checks green (`python -m src.ingest.verify`).
-**Next: Phase 3** — implement P1–P3 from `docs/patterns.md` as Cypher + Datalog.
+**Phases 0–4 complete (2026-06-12):** KG loaded & verified (380 matches, 1.31M events);
+P1–P3 materialized as PatternInstances (9,121/979/6,998) with StatsBomb-signal validation,
+Datalog re-expression (Soufflé + DuckDB recursive CTEs, exact cross-validation, LO2),
+PROFILE-based index tuning (LO6); team-style metrics + Streamlit dashboard
+(`streamlit run src/dashboard/app.py`) with PCA/clustering/similarity + pitch maps (LO11).
+**Next: Phase 5** — PyKEEN embeddings (LO1/LO8), then report (Phase 6).
 Current state & onboarding: **`docs/handover.md`**.
 
 ## Data

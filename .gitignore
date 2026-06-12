@@ -13,5 +13,8 @@ __pycache__/
 # Generated artifacts (Datalog facts, triple exports, results)
 generated/
 
+# Local tooling config (platform-specific paths)
+.claude/
+
 # macOS
 .DS_Store
