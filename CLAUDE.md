@@ -18,13 +18,15 @@ We build a temporal KG from StatsBomb open football event data. Entities: matche
 
 ## Status
 
-**Phases 0–4 complete (2026-06-12):** KG loaded & verified (380 matches, 1.31M events);
+**Phases 0–5 complete (2026-06-12):** KG loaded & verified (380 matches, 1.31M events);
 P1–P3 materialized as PatternInstances (9,121/979/6,998) with StatsBomb-signal validation,
 Datalog re-expression (Soufflé + DuckDB recursive CTEs, exact cross-validation, LO2),
 PROFILE-based index tuning (LO6); team-style metrics + Streamlit dashboard
-(`streamlit run src/dashboard/app.py`) with PCA/clustering/similarity + pitch maps (LO11).
-**Next: Phase 5** — PyKEEN embeddings (LO1/LO8), then report (Phase 6).
+(`streamlit run src/dashboard/app.py`) with PCA/clustering/similarity + pitch maps (LO11);
+PyKEEN TransE/ComplEx on 9.3k exported triples with link-prediction eval + style-cluster
+cross-check (LO1/LO8/LO12). **Next: Phase 6** — the report (Overleaf).
 Current state & onboarding: **`docs/handover.md`**.
+**Workflow note: Tim reviews and commits himself — never create git commits.**
 
 ## Data
 

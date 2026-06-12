@@ -9,7 +9,7 @@
 | 2 — Ingestion PL 2015/16 → Neo4j | ✅ done & verified (re-runnable on any machine) |
 | 3 — Pattern queries (Cypher + Datalog) | ✅ done — see below |
 | 4 — Style analytics + Streamlit dashboard | ✅ v1 done (2026-06-12) — see below |
-| 5 — PyKEEN embeddings (LO1/LO8) | pending |
+| 5 — PyKEEN embeddings (LO1/LO8) | ✅ done (2026-06-12) — see below |
 | 6 — Report (Overleaf) + submission | pending — Overleaf project not yet created |
 
 **KG contents (verified by `python -m src.ingest.verify`, all checks green):**
@@ -84,13 +84,37 @@ RETURN e.idx, e.type, e.x, e.y ORDER BY e.idx;
   pattern: P1 pressure KDE, P2 start→shot arrows, P3 entry points), *Compare teams*
   (radar overlay + side-by-side pitch maps). All tabs smoke-tested headless.
 
+**Phase 5 results (2026-06-12):**
+
+- `src/embeddings/export_triples.py` (main venv) — flattens the property graph into
+  9,300 (h,r,t) triples / 596 entities over 4 relations: `plays_for` (561),
+  `plays_position` (2,179), `passes_to` (5,774; completed passes, pairs ≥ 10),
+  `exhibits_pattern` (786; players in ≥ 10 pattern-instance anchors). Deliberately the
+  aggregated player/team layer — literals and the 1.3M-event stream cannot embed (LO4/LO12).
+- `src/embeddings/train.py` (in `.venv-emb`: `pip install -r requirements-embeddings.txt`,
+  works on Python 3.13 / torch 2.12 CPU / pykeen 1.11) — TransE + ComplEx, dim 64,
+  150 epochs, 80/10/10 split, filtered evaluation:
+  | model | MRR | Hits@1 | Hits@3 | Hits@10 |
+  |---|---|---|---|---|
+  | TransE | 0.255 | 0.021 | 0.394 | 0.721 |
+  | ComplEx | 0.265 | 0.120 | 0.334 | 0.553 |
+  TransE's near-zero Hits@1 vs ComplEx is the textbook 1-N relation weakness — report material.
+- **LO12 cross-check:** nearest embedding neighbour shares the Phase-4 style cluster for
+  9/20 teams (ComplEx) vs ~4/20 random baseline; TransE 5/20 ≈ chance. Qualitative hits:
+  City↔United↔Chelsea adjacent; Stoke/Watford/Palace/WBA (direct, physical sides) form a
+  tight neighbourhood. Outputs: `generated/embeddings/` (summary.json, metrics_*.csv,
+  team_neighbours_*.txt).
+- **LO8 framing:** the held-out evaluation *is* KG completion — Hits@10 = 0.72 means the
+  model recovers a missing link in the top-10 candidates 72% of the time.
+
 ## Next up
 
-1. **Phase 5:** PyKEEN embeddings on exported triples (LO1, framed as KG completion for
-   LO8) — install `requirements-embeddings.txt` in a separate venv if torch fights 3.13.
-2. **Phase 6:** Report (Overleaf, still to be created) — LO6 material ready in
-   `generated/profiles*/`, validation numbers in `python -m src.patterns.validate`.
-3. Dashboard polish if time allows (match drill-down, P1→P2 chain views).
+1. **Phase 6:** Report (Overleaf, still to be created) — LO6 material ready in
+   `generated/profiles*/`, validation numbers via `python -m src.patterns.validate`,
+   embedding numbers in `generated/embeddings/summary.json`.
+2. Dashboard polish if time allows (match drill-down, P1→P2 chain views).
+3. Final LO checklist pass against the cover pages (all 10 claimed LOs need an
+   (LOx)-tagged paragraph).
 
 ## Gotchas / lessons (also report material)
 
