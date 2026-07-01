@@ -16,5 +16,9 @@ generated/
 # Local tooling config (platform-specific paths)
 .claude/
 
+# Downloaded club crests + PL logo (regenerate via src.dashboard.fetch_assets;
+# trademarks of their clubs, kept out of the repo)
+src/dashboard/assets/
+
 # macOS
 .DS_Store

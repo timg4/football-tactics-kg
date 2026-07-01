@@ -1,217 +1,685 @@
 """Streamlit dashboard: team-style comparison on the football KG (LO11).
 
-Reads generated/style/metrics.csv (python -m src.dashboard.metrics) and the
-pattern instances from Neo4j (docker compose up -d).
+Insight-first design: plain-language labels, an auto-generated verdict per team,
+and difference-vs-league pitch maps (a team's absolute maps look like every other
+PL team's — the *style* is the deviation from the league average). Team crests and
+the Premier League logo are loaded from src/dashboard/assets (fetch_assets.py).
+
+Reads generated/style/metrics.csv (python -m src.dashboard.metrics) and the pattern
+instances from Neo4j (docker compose up -d).
 
 Run:  streamlit run src/dashboard/app.py
 """
 
+import base64
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
+import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import streamlit as st
+from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 from mplsoccer import Pitch
 from scipy.cluster import hierarchy
-from sklearn.decomposition import PCA
-from sklearn.metrics.pairwise import cosine_similarity
 
 from src.ingest import common
 
-st.set_page_config(page_title="PL 2015/16 Team Style KG", layout="wide")
+ASSETS = REPO_ROOT / "src" / "dashboard" / "assets"
+CRESTS = ASSETS / "crests"
 
-STYLE_DIMS = ["pressing", "directness", "wide", "possession_share", "avg_poss_len"]
-DIM_LABELS = {
-    "pressing": "Pressing intensity\n(P1 / opp. possession)",
-    "directness": "Directness\n(P2 / own-half open play)",
-    "wide": "Wide orientation\n(P3 / final-third entry)",
-    "possession_share": "Possession share",
-    "avg_poss_len": "Possession length\n(events)",
-}
+# Premier League brand palette
+PL_PURPLE = "#37003C"
+PL_PINK = "#E90052"
+PL_GREEN = "#00FF85"
 
-PITCH_QUERIES = {
-    "P1": """
-        MATCH (pi:PatternInstance {pattern:'P1'})-[:EXHIBITED_BY]->(:Team {name:$team})
-        MATCH (pi)-[:MATCHES]->(p:Pressure)
-        RETURN p.x AS x, p.y AS y
-    """,
-    "P2": """
-        MATCH (pi:PatternInstance {pattern:'P2'})-[:EXHIBITED_BY]->(:Team {name:$team})
-        MATCH (pi)-[:MATCHES]->(e:Event)
-        WITH pi, e ORDER BY e.idx
-        WITH pi, collect(e) AS es
-        RETURN es[0].x AS x1, es[0].y AS y1,
-               es[-1].x AS x2, es[-1].y AS y2, es[-1].xg AS xg
-    """,
-    "P3": """
-        MATCH (pi:PatternInstance {pattern:'P3'})-[:EXHIBITED_BY]->(:Team {name:$team})
-        MATCH (pi)-[:MATCHES]->(e:Event)-[:IN_ZONE]->(:Zone {third:'final'})
-        RETURN e.x AS x, e.y AS y
-    """,
+st.set_page_config(page_title="Premier League 2015/16 — Team Styles",
+                   page_icon=str(ASSETS / "premier_league.png") if
+                   (ASSETS / "premier_league.png").exists() else None,
+                   layout="wide")
+
+st.markdown(f"""
+<style>
+    #MainMenu, footer, [data-testid="stToolbar"] {{ visibility: hidden; }}
+    .block-container {{ padding-top: 2.5rem; max-width: 1300px; }}
+    h1, h2, h3 {{ color: {PL_PURPLE}; font-weight: 700; }}
+    [data-testid="stMetricValue"] {{ font-size: 1.4rem; color: {PL_PURPLE}; }}
+    [data-testid="stMetricLabel"] {{ font-weight: 600; }}
+    .stTabs [data-baseweb="tab-list"] {{ gap: 4px; }}
+    .stTabs [data-baseweb="tab"] {{ font-weight: 600; }}
+    .stTabs [aria-selected="true"] {{ color: {PL_PINK} !important; }}
+</style>
+""", unsafe_allow_html=True)
+
+# --- plain-language metadata for every metric --------------------------------
+# key -> (short label, one-line football meaning, positive trait, negative trait)
+METRICS = {
+    "pressing": (
+        "Pressing",
+        "How often the team presses in the opponent half and wins the ball back "
+        "within 5 s — per opponent possession.",
+        "presses high and intensely",
+        "presses little and sits back"),
+    "directness": (
+        "Directness",
+        "How often a deep ball recovery becomes a shot within 15 s — fast, "
+        "vertical transitions.",
+        "plays fast and vertically",
+        "plays patiently, with few transitions"),
+    "wide": (
+        "Wide play",
+        "How often the team reaches the final third through the wings rather than "
+        "centrally.",
+        "builds up down the wings",
+        "builds up centrally"),
+    "possession_share": (
+        "Possession",
+        "Share of all possessions in a match that belong to the team.",
+        "dominates possession",
+        "cedes the ball to the opponent"),
+    "avg_poss_len": (
+        "Build-up patience",
+        "Average length of a possession in actions — long means patient, "
+        "controlled build-up.",
+        "keeps the ball for long spells",
+        "plays in short, quick spells"),
 }
+DIMS = list(METRICS)
+LABEL = {k: v[0] for k, v in METRICS.items()}
+
+PATTERN_INTRO = {
+    "Pressing (P1)": "Press high and win the ball back within 5 seconds.",
+    "Counter-attacks (P2)": "Win the ball deep and get a shot away within 15 seconds.",
+    "Wide build-up (P3)": "Progress into the final third through the wings.",
+}
+PATTERN_METRIC = {"Pressing (P1)": "pressing",
+                  "Counter-attacks (P2)": "directness",
+                  "Wide build-up (P3)": "wide"}
+
+N_CLUSTERS = 4
+
+# Every pitch map answers ONE question with one annotated number, instead of an
+# abstract heatmap. NB: EXHIBITED_BY and MATCHES both start at pi, so they must
+# be *separate* MATCH clauses — chaining them through Team matches nothing.
+ALL_PRESSURES = ("MATCH (p:Pressure)-[:BY_TEAM]->(:Team {name:$team}) "
+                 "RETURN p.x AS x, p.y AS y")
+P3_ENTRIES = ("MATCH (pi:PatternInstance {{pattern:'P3'}}){team} "
+              "MATCH (pi)-[:MATCHES]->(e:Event)-[:IN_ZONE]->(:Zone {{third:'final'}}) "
+              "RETURN e.x AS x, e.y AS y")
+P2_RUNS = """
+    MATCH (pi:PatternInstance {pattern:'P2'})-[:EXHIBITED_BY]->(:Team {name:$team})
+    MATCH (pi)-[:MATCHES]->(e:Event)
+    WITH pi, e ORDER BY e.idx
+    WITH pi, collect(e) AS es
+    RETURN es[0].x AS x1, es[0].y AS y1, es[-1].x AS x2, es[-1].y AS y2,
+           pi.t_end - pi.t_start AS dur, es[-1].outcome AS outcome
+"""
+# drill-down: the actual moments behind the aggregate (KG provenance)
+FASTEST_COUNTERS = """
+    MATCH (pi:PatternInstance {pattern:'P2'})-[:EXHIBITED_BY]->(t:Team {name:$team})
+    MATCH (pi)-[:FOUND_IN]->(m:Match)
+    MATCH (o:Team)-[:HOME_IN|AWAY_IN]->(m) WHERE o.team_id <> t.team_id
+    MATCH (pi)-[:MATCHES]->(s:Shot)
+    RETURN m.week AS week, o.name AS opponent, s.minute AS minute,
+           round(10 * (pi.t_end - pi.t_start)) / 10 AS seconds,
+           s.outcome AS outcome
+    ORDER BY seconds LIMIT 5
+"""
 
 
 @st.cache_data
 def load_metrics():
     path = REPO_ROOT / "generated" / "style" / "metrics.csv"
     if not path.exists():
-        st.error("metrics.csv missing — run `python -m src.dashboard.metrics` first")
+        st.error("metrics.csv missing — run `python -m src.dashboard.metrics` first.")
         st.stop()
     df = pd.read_csv(path).sort_values("team").reset_index(drop=True)
-    z = (df[STYLE_DIMS] - df[STYLE_DIMS].mean()) / df[STYLE_DIMS].std()
+    z = (df[DIMS] - df[DIMS].mean()) / df[DIMS].std()
     return df, z
 
 
 @st.cache_data
 def fetch(query, **params):
     driver = common.get_driver()
-    with driver.session() as s:
-        rows = [dict(r) for r in s.run(query, **params)]
-    driver.close()
+    try:
+        with driver.session() as s:
+            rows = [dict(r) for r in s.run(query, **params)]
+    except Exception as e:  # Neo4j down — maps degrade gracefully, metrics still work
+        st.warning(f"Neo4j unreachable ({e}). Pitch maps hidden — run "
+                   "`docker compose up -d`.")
+        return pd.DataFrame()
+    finally:
+        driver.close()
     return pd.DataFrame(rows)
 
 
+def ordinal(n):
+    suffix = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+
+@st.cache_data
+def standings():
+    """Final league table computed from the match scores in the KG."""
+    rows = fetch("MATCH (h:Team)-[:HOME_IN]->(m:Match)<-[:AWAY_IN]-(a:Team) "
+                 "RETURN h.team_id AS home, a.team_id AS away, "
+                 "m.home_score AS hs, m.away_score AS asc")
+    if rows.empty:
+        return None
+    from collections import defaultdict
+    t = defaultdict(lambda: dict(points=0, W=0, D=0, L=0, gf=0, ga=0))
+    for _, r in rows.iterrows():
+        h, a, hs, as_ = int(r.home), int(r.away), int(r.hs), int(r.asc)
+        t[h]["gf"] += hs; t[h]["ga"] += as_
+        t[a]["gf"] += as_; t[a]["ga"] += hs
+        if hs > as_:
+            t[h]["points"] += 3; t[h]["W"] += 1; t[a]["L"] += 1
+        elif hs < as_:
+            t[a]["points"] += 3; t[a]["W"] += 1; t[h]["L"] += 1
+        else:
+            t[h]["points"] += 1; t[a]["points"] += 1
+            t[h]["D"] += 1; t[a]["D"] += 1
+    tbl = pd.DataFrame([{"team_id": k, "points": v["points"], "W": v["W"],
+                         "D": v["D"], "L": v["L"], "gd": v["gf"] - v["ga"]}
+                        for k, v in t.items()])
+    tbl = tbl.sort_values(["points", "gd"], ascending=False).reset_index(drop=True)
+    tbl["position"] = tbl.index + 1
+    return tbl
+
+
+def crest_path(team_id):
+    p = CRESTS / f"{team_id}.png"
+    return str(p) if p.exists() else None
+
+
+@st.cache_data
+def crest_img(team_id):
+    p = CRESTS / f"{team_id}.png"
+    return mpimg.imread(str(p)) if p.exists() else None
+
+
+def team_id_of(df, team):
+    return int(df.loc[df.team == team, "team_id"].iloc[0])
+
+
+def team_header(df, team, level="##"):
+    c1, c2 = st.columns([1, 11])
+    path = crest_path(team_id_of(df, team))
+    if path:
+        c1.image(path, width=52)
+    c2.markdown(f"{level} {team}")
+
+
+def p3_entries(team=None):
+    clause = "-[:EXHIBITED_BY]->(:Team {name:$team})" if team else ""
+    q = P3_ENTRIES.format(team=clause)
+    return fetch(q, team=team) if team else fetch(q)
+
+
+@st.cache_data
+def league_high_press_share():
+    d = fetch("MATCH (p:Pressure) RETURN "
+              "toFloat(count(CASE WHEN p.x >= 60 THEN 1 END)) / count(*) AS m")
+    return float(d.m.iloc[0]) if len(d) else None
+
+
+@st.cache_data
+def league_left_share():
+    d = p3_entries()
+    return float((d.y < 40).mean()) if len(d) else None
+
+
+def rank_of(df, dim, value):
+    """1 = highest in the league."""
+    return int((df[dim] > value).sum()) + 1
+
+
+def verdict(team, row, zrow, df):
+    """Auto-generated plain-language style summary from the z-scores.
+
+    All trait phrases are main-clause ("<team> presses high"), so they read
+    correctly whether used as a headline or a bullet.
+    """
+    order = sorted(DIMS, key=lambda d: -abs(zrow[d]))
+    lead = order[0]
+    _, _, pos, neg = METRICS[lead]
+    phrase = pos if zrow[lead] > 0 else neg
+    r = rank_of(df, lead, row[lead])
+    if r == 1:
+        head = f"**League-leading:** {team} {phrase}."
+    elif r == len(df):
+        head = f"**League-trailing:** {team} {phrase}."
+    else:
+        head = f"{team} {phrase}."
+
+    bullets = []
+    for d in order:
+        z = zrow[d]
+        if abs(z) < 0.8 or d == lead:
+            continue
+        _, _, pos, neg = METRICS[d]
+        bullets.append(f"{pos if z > 0 else neg} "
+                       f"(rank {rank_of(df, d, row[d])}/{len(df)})")
+    return head, bullets[:3]
+
+
+def draw_pitch():
+    pitch = Pitch(pitch_type="statsbomb", line_color="#999", line_zorder=2,
+                  pitch_color="none")
+    fig, ax = pitch.draw(figsize=(6, 4))
+    return pitch, fig, ax
+
+
+def pressing_map(team):
+    """One question: how HIGH does this team press?"""
+    d = fetch(ALL_PRESSURES, team=team)
+    pitch, fig, ax = draw_pitch()
+    if len(d) < 10:
+        return fig, "Not enough pressing actions to draw a map."
+    pitch.kdeplot(d.x, d.y, ax=ax, fill=True, cmap="Purples", levels=25,
+                  alpha=0.85, zorder=1)
+    share = float((d.x >= 60).mean())
+    lg = league_high_press_share() or 0.4
+    ax.axvline(60, color=PL_PINK, lw=1.5, ls=":", zorder=3)
+    ax.set_title(f"{share:.0%} of presses happen in the opponent's half "
+                 f"(league: {lg:.0%})", fontsize=9, color="#333")
+    cap = (f"All {len(d):,} pressing actions this season. Darker purple = presses "
+           "more often there. Everything right of the dotted line is in the "
+           "opponent's half — the more pressing there, the higher and more "
+           "aggressive the press.")
+    return fig, cap
+
+
+def counter_map(team):
+    """One question: where do counters start, and how fast are they?"""
+    d = fetch(P2_RUNS, team=team).dropna(subset=["x1", "x2"])
+    pitch, fig, ax = draw_pitch()
+    if not len(d):
+        return fig, "No counter-attacks found for this team."
+    goals = d[d.outcome == "Goal"]
+    other = d[d.outcome != "Goal"]
+    pitch.scatter(d.x1, d.y1, ax=ax, s=30, color=PL_GREEN,
+                  edgecolors="#1a8a55", linewidth=0.8, alpha=0.85, zorder=3)
+    pitch.scatter(other.x2, other.y2, ax=ax, s=30, color=PL_PINK,
+                  edgecolors="#90003a", linewidth=0.8, alpha=0.85, zorder=3)
+    if len(goals):
+        pitch.scatter(goals.x2, goals.y2, ax=ax, s=150, marker="*",
+                      color="#FFD700", edgecolors="#8a6d00", linewidth=0.8,
+                      zorder=5)
+    pitch.arrows(d.x1.mean(), d.y1.mean(), d.x2.mean(), d.y2.mean(), ax=ax,
+                 width=3, headwidth=7, color=PL_PURPLE, zorder=4)
+    dur = float(d.dur.mean())
+    goal_word = "goal" if len(goals) == 1 else "goals"
+    ax.set_title(f"{len(d)} counter-attacks · avg {dur:.0f}s from winning the "
+                 f"ball to the shot · {len(goals)} {goal_word}", fontsize=9,
+                 color="#333")
+    cap = ("Green dots = where the ball was won, pink dots = where the resulting "
+           "shot was taken, gold stars = counters that ended in a goal. The "
+           "purple arrow joins the average recovery spot to the average shot "
+           "spot — a longer arrow means counters covering more ground.")
+    return fig, cap
+
+
+def wide_map(team):
+    """One question: which flank does the build-up favour?"""
+    d = p3_entries(team)
+    pitch, fig, ax = draw_pitch()
+    if not len(d):
+        return fig, "No wide build-ups found for this team."
+    pitch.scatter(d.x, d.y, ax=ax, s=26, color=PL_PURPLE, alpha=0.45, zorder=3)
+    left = float((d.y < 40).mean())
+    lg_left = league_left_share() or 0.5
+    # y axis is inverted on the drawn pitch: small y renders at the top
+    ax.text(40, 6, f"left flank {left:.0%}  (league {lg_left:.0%})",
+            fontsize=9, color=PL_PURPLE, ha="center", fontweight="bold", zorder=4)
+    ax.text(40, 76, f"right flank {1 - left:.0%}  (league {1 - lg_left:.0%})",
+            fontsize=9, color=PL_PURPLE, ha="center", fontweight="bold", zorder=4)
+    ax.set_title(f"{len(d)} wide build-ups — where they enter the final third",
+                 fontsize=9, color="#333")
+    cap = ("Each dot = the moment a patient build-up enters the final third "
+           "through a wing. The percentages show which flank the team favours, "
+           "compared with the league split.")
+    return fig, cap
+
+
+def pattern_map(choice, team):
+    if choice.startswith("Pressing"):
+        return pressing_map(team)
+    if choice.startswith("Counter"):
+        return counter_map(team)
+    return wide_map(team)
+
+
 def radar(ax, zrow, label, color):
-    angles = np.linspace(0, 2 * np.pi, len(STYLE_DIMS), endpoint=False)
-    values = np.clip(zrow.to_numpy(), -2.5, 2.5)
-    angles = np.concatenate([angles, angles[:1]])
-    values = np.concatenate([values, values[:1]])
-    ax.plot(angles, values, color=color, label=label)
-    ax.fill(angles, values, color=color, alpha=0.15)
-    ax.set_xticks(angles[:-1])
-    ax.set_xticklabels([DIM_LABELS[d].split("\n")[0] for d in STYLE_DIMS],
-                       fontsize=8)
+    ang = np.linspace(0, 2 * np.pi, len(DIMS), endpoint=False)
+    val = np.clip(zrow.to_numpy(), -2.5, 2.5)
+    ang = np.concatenate([ang, ang[:1]])
+    val = np.concatenate([val, val[:1]])
+    ax.plot(ang, val, color=color, label=label, linewidth=2)
+    ax.fill(ang, val, color=color, alpha=0.15)
+    ax.set_xticks(ang[:-1])
+    ax.set_xticklabels([LABEL[d] for d in DIMS], fontsize=8)
     ax.set_ylim(-2.5, 2.5)
     ax.set_yticks([-2, -1, 0, 1, 2])
-    ax.set_yticklabels([])
+    ax.set_yticklabels(["--", "-", "avg", "+", "++"], fontsize=7, color="#999")
+    ax.axhline(0, color="#ccc", lw=0.5)
 
 
-def pitch_figure(team, pattern):
-    pitch = Pitch(pitch_type="statsbomb", line_color="#777", line_zorder=2)
-    fig, ax = pitch.draw(figsize=(6, 4))
-    if pattern == "P1":
-        d = fetch(PITCH_QUERIES["P1"], team=team)
-        if len(d):
-            pitch.kdeplot(d.x, d.y, ax=ax, fill=True, cmap="Reds", levels=50, alpha=0.8)
-            ax.set_title(f"P1 pressing regains — pressure locations ({len(d)})", fontsize=9)
-    elif pattern == "P2":
-        d = fetch(PITCH_QUERIES["P2"], team=team).dropna(subset=["x1", "x2"])
-        if len(d):
-            pitch.arrows(d.x1, d.y1, d.x2, d.y2, ax=ax, width=1.2,
-                         headwidth=6, color="#1f77b4", alpha=0.5)
-            ax.set_title(f"P2 fast transitions — start → shot ({len(d)})", fontsize=9)
-    else:
-        d = fetch(PITCH_QUERIES["P3"], team=team)
-        if len(d):
-            pitch.scatter(d.x, d.y, ax=ax, s=18, color="#2ca02c", alpha=0.4)
-            ax.set_title(f"P3 wide build-ups — final-third entries ({len(d)})", fontsize=9)
+def style_families(df, z, teams):
+    link = hierarchy.linkage(z, method="ward")
+    labels = hierarchy.fcluster(link, N_CLUSTERS, criterion="maxclust")
+    fams = []
+    for c in sorted(set(labels)):
+        idx = [i for i in range(len(teams)) if labels[i] == c]
+        mean_z = z.iloc[idx].mean()
+        traits = [f"{'high' if mean_z[d] > 0 else 'low'} {LABEL[d].lower()}"
+                  for d in mean_z.abs().sort_values(ascending=False).index[:2]]
+        fams.append((", ".join(traits), [teams[i] for i in idx],
+                     [int(df.iloc[i].team_id) for i in idx]))
+    return fams
+
+
+def scatter_crests(df, xdim, ydim):
+    fig, ax = plt.subplots(figsize=(9, 6))
+    for _, r in df.iterrows():
+        img = crest_img(int(r.team_id))
+        if img is not None:
+            ab = AnnotationBbox(OffsetImage(img, zoom=0.055), (r[xdim], r[ydim]),
+                                frameon=False)
+            ax.add_artist(ab)
+        else:
+            ax.scatter(r[xdim], r[ydim], s=40, color=PL_PURPLE)
+        if HAS_TABLE and not pd.isna(r.get("position")):
+            ax.annotate(ordinal(int(r["position"])), (r[xdim], r[ydim]),
+                        fontsize=6, color="#999", ha="center",
+                        xytext=(0, -12), textcoords="offset points")
+    ax.update_datalim(df[[xdim, ydim]].to_numpy())
+    ax.autoscale_view()
+    ax.margins(0.08)
+    ax.axvline(df[xdim].mean(), color="#ccc", lw=0.8, ls="--")
+    ax.axhline(df[ydim].mean(), color="#ccc", lw=0.8, ls="--")
+    ax.set_xlabel(LABEL[xdim])
+    ax.set_ylabel(LABEL[ydim])
+    ax.spines[["top", "right"]].set_visible(False)
     return fig
 
 
+# =============================================================================
 df, z = load_metrics()
+_tbl = standings()
+if _tbl is not None:
+    df = df.merge(_tbl, on="team_id", how="left")  # preserves order → z stays aligned
+HAS_TABLE = _tbl is not None
 teams = df["team"].tolist()
 
-st.title("A Temporal Football KG — Team Style, PL 2015/16")
-st.caption("Tactical patterns mined from the knowledge graph as Cypher/Datalog rules; "
-           "data: StatsBomb Open Data.")
 
-tab_league, tab_team, tab_compare = st.tabs(
+def finish_line(row):
+    if not HAS_TABLE or pd.isna(row.get("position")):
+        return None
+    return (f"Finished **{ordinal(int(row['position']))}** · {int(row['points'])} pts "
+            f"· {int(row['W'])}W–{int(row['D'])}D–{int(row['L'])}L · GD {int(row['gd']):+d}")
+
+_pl_logo = ASSETS / "premier_league.png"
+_logo_html = ""
+if _pl_logo.exists():
+    _logo_b64 = base64.b64encode(_pl_logo.read_bytes()).decode()
+    _logo_html = (f'<img src="data:image/png;base64,{_logo_b64}" '
+                  'style="height:62px; filter: brightness(0) invert(1);">')
+st.markdown(f"""
+<div style="background: linear-gradient(100deg, {PL_PURPLE} 0%, #59095f 55%, {PL_PINK} 140%);
+            border-radius: 14px; padding: 24px 30px; margin-bottom: 10px;
+            display: flex; align-items: center; gap: 22px;">
+  {_logo_html}
+  <div>
+    <div style="color: #ffffff; font-size: 1.85rem; font-weight: 800; line-height: 1.15;">
+      Premier League 2015/16 — Team Playing Styles</div>
+    <div style="color: #ffffffbb; font-size: 0.95rem; margin-top: 6px;">
+      Three tactical patterns, mined from a knowledge graph as rules and compared
+      across all 20 teams &nbsp;·&nbsp; StatsBomb Open Data</div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+tab_league, tab_team, tab_cmp = st.tabs(
     ["League overview", "Team profile", "Compare teams"])
 
+# --- LEAGUE ------------------------------------------------------------------
 with tab_league:
-    left, right = st.columns([3, 2])
-    with left:
-        st.subheader("Style metrics (per team, season totals normalized)")
-        show = df[["team"] + STYLE_DIMS].set_index("team")
-        st.dataframe(show.style.background_gradient(cmap="RdYlGn", axis=0)
-                     .format("{:.3f}"), height=740)
-    with right:
-        st.subheader("Style map (PCA of z-scored style vectors)")
-        pca = PCA(n_components=2)
-        xy = pca.fit_transform(z)
-        fig, ax = plt.subplots(figsize=(6, 5))
-        ax.scatter(xy[:, 0], xy[:, 1], s=30, color="#1f77b4")
-        for i, t in enumerate(teams):
-            ax.annotate(t, (xy[i, 0], xy[i, 1]), fontsize=7,
-                        xytext=(4, 2), textcoords="offset points")
-        ax.set_xlabel(f"PC1 ({pca.explained_variance_ratio_[0]:.0%})")
-        ax.set_ylabel(f"PC2 ({pca.explained_variance_ratio_[1]:.0%})")
-        ax.spines[["top", "right"]].set_visible(False)
-        st.pyplot(fig, use_container_width=True)
+    st.subheader("The three playing patterns")
+    st.write("Each team is described by how often it creates these three recurring "
+             "situations — always **relative to its opportunities**, so possession "
+             "differences do not distort the numbers.")
+    cols = st.columns(3)
+    for col, (name, desc) in zip(cols, PATTERN_INTRO.items()):
+        leader = df.loc[df[PATTERN_METRIC[name]].idxmax(), "team"]
+        with col:
+            st.markdown(f"**{name}**")
+            st.caption(desc)
+            lc1, lc2 = st.columns([1, 4])
+            path = crest_path(team_id_of(df, leader))
+            if path:
+                lc1.image(path, width=34)
+            lc2.metric("League leader", leader)
 
-        st.subheader("Style clusters (Ward)")
-        link = hierarchy.linkage(z, method="ward")
-        fig, ax = plt.subplots(figsize=(6, 4))
-        hierarchy.dendrogram(link, labels=teams, orientation="right",
-                             leaf_font_size=8, ax=ax)
-        ax.spines[["top", "right", "bottom"]].set_visible(False)
-        st.pyplot(fig, use_container_width=True)
+    if HAS_TABLE:
+        st.divider()
+        st.subheader("The season at a glance")
+        st.caption("Final table with each team's style profile. Style bars are "
+                   "scaled between the league's lowest and highest value.")
+        view = df.sort_values("position")[
+            ["position", "team", "points", "W", "D", "L", "gd"] + DIMS]
+        colcfg = {
+            "position": st.column_config.NumberColumn("Pos", width="small"),
+            "team": st.column_config.TextColumn("Team", width="medium"),
+            "points": st.column_config.NumberColumn("Pts", width="small"),
+            "W": st.column_config.NumberColumn("W", width="small"),
+            "D": st.column_config.NumberColumn("D", width="small"),
+            "L": st.column_config.NumberColumn("L", width="small"),
+            "gd": st.column_config.NumberColumn("GD", width="small"),
+        }
+        for d in DIMS:
+            colcfg[d] = st.column_config.ProgressColumn(
+                LABEL[d], help=METRICS[d][1],
+                format="%.1f" if d == "avg_poss_len" else "%.3f",
+                min_value=float(df[d].min()), max_value=float(df[d].max()))
+        st.dataframe(view, column_config=colcfg, hide_index=True, height=738)
 
-    st.subheader("Team similarity (cosine, z-scored style vectors)")
-    order = hierarchy.leaves_list(hierarchy.linkage(z, method="ward"))
-    sim = cosine_similarity(z.iloc[order])
-    fig, ax = plt.subplots(figsize=(8, 6.5))
-    im = ax.imshow(sim, cmap="RdBu_r", vmin=-1, vmax=1)
-    labels = [teams[i] for i in order]
-    ax.set_xticks(range(len(labels)), labels, rotation=90, fontsize=7)
-    ax.set_yticks(range(len(labels)), labels, fontsize=7)
-    fig.colorbar(im, shrink=0.8)
-    st.pyplot(fig, use_container_width=False)
+    st.divider()
+    st.subheader("Who stands out?")
+    st.caption("Teams ranked by one metric. Values are normalized per opportunity, "
+               "not raw counts.")
+    metric = st.selectbox("Metric", DIMS, format_func=lambda d: LABEL[d])
+    st.caption(f"{METRICS[metric][1]}")
+    ranked = df.sort_values(metric)
+    fig, ax = plt.subplots(figsize=(8, 5))
+    if HAS_TABLE:
+        norm = plt.Normalize(vmin=1, vmax=len(df))
+        cmap = plt.cm.RdYlGn_r
+        ax.barh(ranked["team"], ranked[metric],
+                color=[cmap(norm(p)) for p in ranked["position"]])
+        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+        sm.set_array([])
+        cb = fig.colorbar(sm, ax=ax, pad=0.02, fraction=0.046)
+        cb.set_label("Final league position", fontsize=8)
+        cb.set_ticks([1, len(df)])
+        cb.set_ticklabels(["1st", f"{len(df)}th"])
+    else:
+        ax.barh(ranked["team"], ranked[metric], color=PL_PURPLE)
+    for j, (tid, val) in enumerate(zip(ranked["team_id"], ranked[metric])):
+        img = crest_img(int(tid))
+        if img is not None:
+            ab = AnnotationBbox(OffsetImage(img, zoom=0.03), (val, j),
+                                frameon=False, box_alignment=(-0.25, 0.5))
+            ax.add_artist(ab)
+    ax.set_xlim(0, ranked[metric].max() * 1.1)
+    ax.set_xlabel(LABEL[metric])
+    ax.spines[["top", "right"]].set_visible(False)
+    st.pyplot(fig, width="stretch")
+    if HAS_TABLE:
+        st.caption("Bar length = how much the team does this. Colour = final league "
+                   "position (green = top, red = bottom) — does this style pay off?")
 
+    st.divider()
+    st.subheader("Style map")
+    st.caption("Each crest is one team. Pick two metrics for the axes — teams in the "
+               "same corner play similarly.")
+    c1, c2 = st.columns(2)
+    xdim = c1.selectbox("X axis", DIMS, index=0, format_func=lambda d: LABEL[d])
+    ydim = c2.selectbox("Y axis", DIMS, index=1, format_func=lambda d: LABEL[d])
+    st.pyplot(scatter_crests(df, xdim, ydim), width="content")
+    st.caption("Dashed lines = league average. Top right = high on both metrics.")
+
+    st.divider()
+    st.subheader("Style families")
+    st.caption("Teams automatically grouped by their overall profile "
+               "(hierarchical clustering over all five metrics).")
+    fams = style_families(df, z, teams)
+    fam_cols = st.columns(len(fams))
+    for col, (traits, members, ids) in zip(fam_cols, fams):
+        with col:
+            st.markdown(f"**{traits.capitalize()}**")
+            paths = [p for p in (crest_path(t) for t in ids) if p]
+            if paths:
+                st.image(paths, width=34)
+            st.caption(", ".join(members))
+
+# --- TEAM --------------------------------------------------------------------
 with tab_team:
-    team = st.selectbox("Team", teams, key="profile_team")
-    row = df[df.team == team].iloc[0]
-    zrow = z.iloc[df.index[df.team == team][0]]
+    team = st.selectbox("Team", teams, key="profile")
+    i = df.index[df.team == team][0]
+    row, zrow = df.iloc[i], z.iloc[i]
 
-    cols = st.columns(5)
-    for c, dim in zip(cols, STYLE_DIMS):
-        rank = int((df[dim] > row[dim]).sum()) + 1
-        c.metric(DIM_LABELS[dim].split("\n")[0], f"{row[dim]:.3f}",
-                 f"rank {rank}/20", delta_color="off")
+    team_header(df, team)
+    fl = finish_line(row)
+    if fl:
+        st.markdown(fl)
+    head, bullets = verdict(team, row, zrow, df)
+    st.markdown(f"### {head}")
+    for b in bullets:
+        st.markdown(f"- {b}")
+    st.caption(f"Season: {int(row.P1)} pressing · {int(row.P2)} counter · "
+               f"{int(row.P3)} wide-build-up situations.")
 
-    left, right = st.columns([1, 2])
+    st.divider()
+    cols = st.columns(len(DIMS))
+    for c, d in zip(cols, DIMS):
+        r = rank_of(df, d, row[d])
+        vs = "above avg" if zrow[d] > 0.25 else "below avg" if zrow[d] < -0.25 else "~ avg"
+        c.metric(LABEL[d], f"Rank {r}/{len(df)}", vs, delta_color="off",
+                 help=METRICS[d][1])
+
+    st.divider()
+    left, right = st.columns([1, 1])
     with left:
-        fig = plt.figure(figsize=(4, 4))
+        st.markdown("**Style profile vs. league**")
+        fig = plt.figure(figsize=(4.2, 4.2))
         ax = fig.add_subplot(polar=True)
-        radar(ax, zrow, team, "#1f77b4")
-        ax.set_title(f"{team} vs league (z-scores)", fontsize=9)
-        st.pyplot(fig, use_container_width=True)
-        st.caption(f"Season: {int(row.P1)} P1 / {int(row.P2)} P2 / {int(row.P3)} P3 "
-                   f"pattern instances.")
+        radar(ax, zrow, team, PL_PURPLE)
+        st.pyplot(fig, width="stretch")
+        st.caption("avg = league average, ++ = well above, -- = well below.")
+
+        # nearest neighbours in style space (cosine on z-scored vectors)
+        zm = z.to_numpy()
+        zn = zm / np.linalg.norm(zm, axis=1, keepdims=True)
+        sims = zn @ zn[i]
+        closest = [j for j in np.argsort(-sims) if j != i][:2]
+        st.markdown("**Plays most like**")
+        sim_cols = st.columns(2)
+        for c, j in zip(sim_cols, closest):
+            other_row = df.iloc[j]
+            with c:
+                s1, s2 = st.columns([1, 3])
+                p = crest_path(int(other_row.team_id))
+                if p:
+                    s1.image(p, width=34)
+                s2.markdown(f"{other_row.team}  \n"
+                            f"<span style='color:#888; font-size:0.85rem;'>"
+                            f"{sims[j]:.0%} style match</span>",
+                            unsafe_allow_html=True)
     with right:
-        pattern = st.radio("Pattern map", ["P1", "P2", "P3"], horizontal=True)
-        st.pyplot(pitch_figure(team, pattern), use_container_width=True)
-        st.caption("Attacking direction: left → right (StatsBomb coordinates).")
+        st.markdown("**Where on the pitch?**")
+        choice = st.radio("Pattern", list(PATTERN_INTRO), horizontal=True)
+        fig, cap = pattern_map(choice, team)
+        st.pyplot(fig, width="stretch")
+        st.caption(cap + " Attacking direction: left to right.")
 
-with tab_compare:
+    st.divider()
+    st.markdown("**The five fastest counter-attacks** — real moments retrieved "
+                "from the knowledge graph")
+    fc = fetch(FASTEST_COUNTERS, team=team)
+    if len(fc):
+        fc = fc.rename(columns={"week": "Matchweek", "opponent": "Opponent",
+                                "minute": "Minute", "seconds": "Seconds to shot",
+                                "outcome": "Shot outcome"})
+        st.dataframe(fc, hide_index=True)
+        st.caption("Each row is an actual pattern instance: the graph links it "
+                   "back to the match, the opponent, and the shot event it ends in.")
+    else:
+        st.caption("No counter-attacks found for this team.")
+
+# --- COMPARE -----------------------------------------------------------------
+with tab_cmp:
     c1, c2 = st.columns(2)
-    a = c1.selectbox("Team A", teams, index=0, key="cmp_a")
-    b = c2.selectbox("Team B", teams, index=1, key="cmp_b")
-    za = z.iloc[df.index[df.team == a][0]]
-    zb = z.iloc[df.index[df.team == b][0]]
+    a = c1.selectbox("Team A", teams, index=0, key="a")
+    b = c2.selectbox("Team B", teams, index=1, key="b")
+    ia, ib = df.index[df.team == a][0], df.index[df.team == b][0]
 
-    fig = plt.figure(figsize=(5, 5))
-    ax = fig.add_subplot(polar=True)
-    radar(ax, za, a, "#1f77b4")
-    radar(ax, zb, b, "#d62728")
-    ax.legend(loc="upper right", bbox_to_anchor=(1.25, 1.1), fontsize=8)
-    st.pyplot(fig, use_container_width=False)
+    col_a, col_b = st.columns(2)
+    for col, team_x, idx in [(col_a, a, ia), (col_b, b, ib)]:
+        with col:
+            team_header(df, team_x, level="###")
+            fl = finish_line(df.iloc[idx])
+            if fl:
+                st.caption(fl)
+            head, bullets = verdict(team_x, df.iloc[idx], z.iloc[idx], df)
+            st.markdown(head)
+            for bl in bullets:
+                st.markdown(f"- {bl}")
 
-    pattern = st.radio("Pattern map", ["P1", "P2", "P3"], horizontal=True,
-                       key="cmp_pattern")
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown(f"**{a}**")
-        st.pyplot(pitch_figure(a, pattern), use_container_width=True)
-    with c2:
-        st.markdown(f"**{b}**")
-        st.pyplot(pitch_figure(b, pattern), use_container_width=True)
+    st.divider()
+    left, right = st.columns([1, 1])
+    with left:
+        st.markdown("**Style profiles overlaid**")
+        fig = plt.figure(figsize=(4.6, 4.6))
+        ax = fig.add_subplot(polar=True)
+        radar(ax, z.iloc[ia], a, PL_PURPLE)
+        radar(ax, z.iloc[ib], b, PL_PINK)
+        ax.legend(loc="upper right", bbox_to_anchor=(1.3, 1.1), fontsize=8)
+        st.pyplot(fig, width="stretch")
+    with right:
+        st.markdown("**Metrics side by side**")
+        data = {}
+        if HAS_TABLE:
+            data["Final position"] = [ordinal(int(df.iloc[ia]["position"])),
+                                      ordinal(int(df.iloc[ib]["position"]))]
+            data["Points"] = [int(df.iloc[ia]["points"]), int(df.iloc[ib]["points"])]
+        for d in DIMS:
+            data[f"{LABEL[d]} (rank)"] = [f"{rank_of(df, d, df.iloc[ia][d])}.",
+                                          f"{rank_of(df, d, df.iloc[ib][d])}."]
+        cmp = pd.DataFrame(data, index=[a, b]).T
+        cmp.columns = [a, b]
+        st.table(cmp)
+        st.caption("Final league position, points, and league rank per style metric "
+                   "(1 = highest value in the league).")
+
+    st.divider()
+    pattern = st.radio("Pitch map", list(PATTERN_INTRO), horizontal=True, key="cmpp")
+    st.caption(PATTERN_INTRO[pattern])
+    m1, m2 = st.columns(2)
+    cap = None
+    for col, team_x in [(m1, a), (m2, b)]:
+        with col:
+            st.markdown(f"**{team_x}**")
+            fig, cap = pattern_map(pattern, team_x)
+            st.pyplot(fig, width="stretch")
+    if cap:
+        st.caption(cap + " Attacking direction: left to right.")
 
 st.divider()
-st.caption("Data: StatsBomb Open Data (https://github.com/statsbomb/open-data). "
-           "KG: Neo4j; patterns P1–P3 materialized as PatternInstance nodes.")
+st.caption("Data: StatsBomb Open Data (github.com/statsbomb/open-data). Patterns "
+           "P1–P3 materialized as PatternInstance nodes in the Neo4j graph. Club "
+           "crests are trademarks of their respective clubs.")

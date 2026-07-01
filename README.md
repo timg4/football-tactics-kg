@@ -152,6 +152,7 @@ python -m src.datalog.run_duckdb        # recursive CTEs vs Cypher counts (exact
 
 # Team-style metrics + dashboard
 python -m src.dashboard.metrics
+python -m src.dashboard.fetch_assets      # club crests + PL logo (optional; graceful fallback)
 streamlit run src/dashboard/app.py
 
 # Embeddings (separate venv — heavy torch dependency)
