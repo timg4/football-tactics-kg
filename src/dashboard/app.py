@@ -119,30 +119,83 @@ P2_RUNS = """
     RETURN es[0].x AS x1, es[0].y AS y1, es[-1].x AS x2, es[-1].y AS y2,
            pi.t_end - pi.t_start AS dur, es[-1].outcome AS outcome
 """
-# signature moment: the team's fastest counter goal, plus the actual ball path
-# reconstructed by walking the possession's event chain in the graph
-SIGNATURE_COUNTER = """
+# Signature moment: one real goal that epitomizes the team's strongest pattern,
+# with the ball path reconstructed by walking the possession's event chain.
+# All three queries return the same columns so the rendering code is shared.
+COUNTER_SIG = """
     MATCH (pi:PatternInstance {pattern:'P2'})-[:EXHIBITED_BY]->(t:Team {name:$team})
     MATCH (pi)-[:MATCHES]->(s:Shot) WHERE s.outcome = 'Goal'
+    MATCH (pi)-[:MATCHES]->(po:Possession)
     MATCH (pi)-[:FOUND_IN]->(m:Match)
     MATCH (o:Team)-[:HOME_IN|AWAY_IN]->(m) WHERE o.team_id <> t.team_id
     OPTIONAL MATCH (s)-[:BY_PLAYER]->(pl:Player)
-    RETURN pi.match_id AS mid, s.idx AS shot_idx, m.week AS week,
-           o.name AS opponent, s.minute AS minute, s.xg AS xg,
-           pl.name AS scorer, pi.t_end - pi.t_start AS dur
+    RETURN pi.match_id AS mid, po.possession AS poss, s.idx AS shot_idx,
+           0 AS start_idx, null AS press_x, null AS press_y,
+           m.week AS week, o.name AS opponent, s.minute AS minute, s.xg AS xg,
+           pl.name AS scorer, pi.t_end - pi.t_start AS dur, null AS actions
     ORDER BY dur LIMIT 1
 """
-COUNTER_PATH = """
-    MATCH (pi:PatternInstance {pattern:'P2', match_id:$mid})
-    MATCH (pi)-[:MATCHES]->(:Shot {idx:$shot_idx})
+# the most patient wide build-up that ended in a goal (most team actions);
+# the drawn path starts at the final-third entry — the full 40+ action
+# possession would be unreadable spaghetti, the actions metric tells that story
+WIDE_SIG = """
+    MATCH (pi:PatternInstance {pattern:'P3'})-[:EXHIBITED_BY]->(t:Team {name:$team})
     MATCH (pi)-[:MATCHES]->(po:Possession)
+    MATCH (pi)-[:MATCHES]->(en:Event)-[:IN_ZONE]->(:Zone {third:'final'})
+    MATCH (s:Shot {outcome:'Goal'})-[:PART_OF]->(po)
+    WHERE (s)-[:BY_TEAM]->(t) AND s.idx >= en.idx
+    MATCH (pi)-[:FOUND_IN]->(m:Match)
+    MATCH (o:Team)-[:HOME_IN|AWAY_IN]->(m) WHERE o.team_id <> t.team_id
+    OPTIONAL MATCH (s)-[:BY_PLAYER]->(pl:Player)
     MATCH (e:Event)-[:PART_OF]->(po)
-    WHERE e.x IS NOT NULL AND e.idx <= $shot_idx
+    WHERE (e)-[:BY_TEAM]->(t) AND e.idx <= s.idx
+    WITH pi, po, en, s, m, o, pl, count(e) AS actions
+    ORDER BY actions DESC LIMIT 1
+    RETURN pi.match_id AS mid, po.possession AS poss, s.idx AS shot_idx,
+           en.idx AS start_idx, null AS press_x, null AS press_y,
+           m.week AS week, o.name AS opponent, s.minute AS minute, s.xg AS xg,
+           pl.name AS scorer, null AS dur, actions
+"""
+# a high press (P1) whose regain turned into a goal within 20 s
+PRESS_SIG = """
+    MATCH (pi:PatternInstance {pattern:'P1'})-[:EXHIBITED_BY]->(t:Team {name:$team})
+    MATCH (pi)-[:MATCHES]->(r:Event) WHERE r.event_id <> pi.anchor
+    MATCH (r)-[:PART_OF]->(po:Possession)-[:POSSESSION_BY]->(t)
+    MATCH (s:Shot {outcome:'Goal'})-[:PART_OF]->(po)
+    WHERE (s)-[:BY_TEAM]->(t) AND s.idx >= r.idx AND s.period = r.period
+      AND s.timestamp_s - pi.t_start <= 20
+    MATCH (p:Event {event_id: pi.anchor})
+    MATCH (pi)-[:FOUND_IN]->(m:Match)
+    MATCH (o:Team)-[:HOME_IN|AWAY_IN]->(m) WHERE o.team_id <> t.team_id
+    OPTIONAL MATCH (s)-[:BY_PLAYER]->(pl:Player)
+    RETURN pi.match_id AS mid, po.possession AS poss, s.idx AS shot_idx,
+           r.idx AS start_idx, p.x AS press_x, p.y AS press_y,
+           m.week AS week, o.name AS opponent, s.minute AS minute, s.xg AS xg,
+           pl.name AS scorer, s.timestamp_s - pi.t_start AS dur, null AS actions
+    ORDER BY dur LIMIT 1
+"""
+POSSESSION_PATH = """
+    MATCH (po:Possession {match_id:$mid, possession:$poss})
+    MATCH (e:Event)-[:PART_OF]->(po)
+    WHERE e.x IS NOT NULL AND e.idx <= $shot_idx AND e.idx >= $start_idx
       AND e.type <> 'Pressure'  // presser location, not the ball
       AND (e)-[:BY_TEAM]->(:Team {name:$team})
     RETURN e.x AS x, e.y AS y
     ORDER BY e.idx
 """
+SIGNATURES = {
+    # style dim -> (query, section headline, duration-metric label)
+    "pressing": (PRESS_SIG,
+                 "Signature press — won the ball high, scored within seconds",
+                 "Press to goal"),
+    "directness": (COUNTER_SIG,
+                   "Signature counter-attack — the fastest counter goal of "
+                   "the season",
+                   "Recovery to goal"),
+    "wide": (WIDE_SIG,
+             "Signature wide build-up — the most patient build-up goal",
+             None),
+}
 
 
 @st.cache_data
@@ -389,15 +442,25 @@ def pattern_map(choice, team):
     return wide_map(team)
 
 
-def signature_counter_fig(team, mid, shot_idx):
-    ev = fetch(COUNTER_PATH, team=team, mid=mid, shot_idx=shot_idx)
+def signature_fig(team, b):
+    """Draw the ball path of one signature goal: a calm thin line with a dot per
+    station — direction is implicit, the path runs from the green start marker
+    to the gold star."""
+    ev = fetch(POSSESSION_PATH, team=team, mid=int(b.mid), poss=int(b.poss),
+               shot_idx=int(b.shot_idx), start_idx=int(b.start_idx))
     pitch, fig, ax = draw_pitch()
     if len(ev) < 2:
         return None
-    pitch.lines(ev.x[:-1], ev.y[:-1], ev.x[1:].values, ev.y[1:].values, ax=ax,
-                comet=True, color=PL_PURPLE, lw=4, alpha=0.7, zorder=3)
-    pitch.scatter([ev.x.iloc[0]], [ev.y.iloc[0]], ax=ax, s=90, color=PL_GREEN,
-                  edgecolors="#1a8a55", linewidth=1, zorder=4)
+    ax.plot(ev.x, ev.y, color=PL_PURPLE, lw=1.8, alpha=0.55, zorder=3,
+            solid_capstyle="round")
+    if len(ev) > 2:
+        pitch.scatter(ev.x[1:-1], ev.y[1:-1], ax=ax, s=26, color=PL_PURPLE,
+                      alpha=0.75, zorder=4)
+    if pd.notna(b.press_x):  # where the press was applied (pressing signature)
+        pitch.scatter([b.press_x], [b.press_y], ax=ax, s=110, marker="X",
+                      color=PL_PINK, edgecolors="#90003a", linewidth=1, zorder=4)
+    pitch.scatter([ev.x.iloc[0]], [ev.y.iloc[0]], ax=ax, s=100, color=PL_GREEN,
+                  edgecolors="#1a8a55", linewidth=1, zorder=5)
     pitch.scatter([ev.x.iloc[-1]], [ev.y.iloc[-1]], ax=ax, s=280, marker="*",
                   color="#FFD700", edgecolors="#8a6d00", linewidth=0.8, zorder=5)
     return fig
@@ -655,14 +718,21 @@ with tab_team:
         with st.expander("How to read this map"):
             st.write(cap + " Attacking direction: left to right.")
 
-    sig = fetch(SIGNATURE_COUNTER, team=team)
-    if len(sig):
-        b = sig.iloc[0]
-        st.divider()
-        st.markdown("**Signature counter-attack** — the fastest counter goal "
-                    "of the season")
-        sfig = signature_counter_fig(team, int(b.mid), int(b.shot_idx))
+    # signature moment for the team's most distinctive pattern (with fallback
+    # to the next-strongest pattern if that one never produced a goal)
+    sig, sig_dim = None, None
+    for dim in sorted(SIGNATURES, key=lambda d: -zrow[d]):
+        found = fetch(SIGNATURES[dim][0], team=team)
+        if len(found):
+            sig, sig_dim = found.iloc[0], dim
+            break
+    if sig is not None:
+        b = sig
+        query, headline, dur_label = SIGNATURES[sig_dim]
+        sfig = signature_fig(team, b)
         if sfig is not None:
+            st.divider()
+            st.markdown(f"**{headline}**")
             s1, s2 = st.columns([2, 1], vertical_alignment="center")
             with s1:
                 show(sfig, width="stretch")
@@ -672,12 +742,18 @@ with tab_team:
                 st.markdown(f"vs **{b.opponent}** · matchweek {int(b.week)} · "
                             f"minute {int(b.minute)}")
                 m1, m2 = st.columns(2)
-                m1.metric("Recovery to goal", f"{b.dur:.1f}s")
+                if dur_label and pd.notna(b.dur):
+                    m1.metric(dur_label, f"{b.dur:.1f}s")
+                elif pd.notna(b.actions):
+                    m1.metric("Actions in build-up", int(b.actions))
                 if pd.notna(b.xg):
                     m2.metric("Shot quality (xG)", f"{b.xg:.2f}")
-                st.caption("The actual ball path, reconstructed by walking this "
-                           "possession's event chain in the knowledge graph — "
-                           "green dot: ball won, gold star: goal.")
+                cap = ("The actual ball path, reconstructed by walking this "
+                       "possession's event chain in the knowledge graph — "
+                       "green dot: sequence start, gold star: goal.")
+                if pd.notna(b.press_x):
+                    cap += " Pink X: where the press won the ball."
+                st.caption(cap)
 
 
 # --- COMPARE -----------------------------------------------------------------
